@@ -2,8 +2,8 @@
 # shellcheck disable=SC2034
 USAGE=""
 # shellcheck disable=SC2034
-DESC="just says meow"
+DESC="access git subcommands"
 
-meow () {
-  echo 'meow'
+git () {
+  command ./git $@
 }
