@@ -1,0 +1,3 @@
+gamma () {
+  echo gamma
+}

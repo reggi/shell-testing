@@ -1,0 +1,3 @@
+beta () {
+  echo beta
+}

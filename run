@@ -1,65 +1,113 @@
-#!/bin/bash
-TOPBASE="$(cd "$(dirname "$0")" || exit; pwd)"
+#!/bin/sh
+__DIRNAME="$(cd "$(dirname "$0")" || exit; pwd)"
+export __DIRNAME
+__FILENAME="$__DIRNAME/$(basename "$0")"
+export __FILENAME
+__CMDNAME=$(basename "${__FILENAME%.*}")
+export __CMDNAME
+__CMDDEEP=""
+export __CMDDEEP
+__ROOT=$__DIRNAME
+export __ROOT
 
 import () {
-  BASE=$TOPBASE
-  __FILENAME="$BASE"/"$1"
-  if [ -n "$__DIRNAME" ];then 
-    BASE=$__DIRNAME
-    __FILENAME=$1
+  __CACHEDIRNAME="$__DIRNAME"
+  __CACHEFILENAME="$__FILENAME"
+
+  __ISABSOLUTE=false
+  case $1 in
+    /*) __ISABSOLUTE=true
+  esac
+  
+  if [ "$__ISABSOLUTE" = false ]; then
+    __FILENAME="$__DIRNAME/$1"
+  else
+    __FILENAME="$1"
   fi
   __DIRNAME="$(cd "$(dirname "$__FILENAME")" || exit; pwd)"
+  
+  ALIAS=""
+  # shellcheck disable=SC1090
   . "$__FILENAME"
+  ALIAS=""
+
+  __DIRNAME="$__CACHEDIRNAME"
+  __FILENAME="$__CACHEFILENAME"
 }
 
 command () {
-  file_name () {
-    basename "${1%.*}"
-  }
-  hyphen () {
-    echo "$1" | tr '_' '-'
-  }
-  underscore () {
-    echo "$1" | tr '-' '_'
-  }
-  USAGE=""
-  DESC=""
+  case $1 in
+    /*) __DIRNAME="$(cd "$(dirname "$1")" || exit; pwd)";;
+    *) __DIRNAME="$(cd "$(dirname "$__DIRNAME/$1")" || exit; pwd)";;
+  esac
 
-  DIR="$__DIRNAME"/"$1"
-  FILES="$(find "$DIR" -maxdepth 1 -type f -name '*.sh' -print | sort -t '\0' -n)"
-  TUSAGE="\\n"
-  USAGE=""
-  DESC=""
-  FOUND=false
-  SUBCOMMAND=$2
-  _SUBCOMMAND=$(underscore "$SUBCOMMAND")
-
-  for FILE in $FILES; do
-    if [ -f "$FILE" ]; then
-      import "$FILE"
-      FNAME=$(file_name "$FILE")
-      PRETTYNAME=$(hyphen "$FNAME")
-      BUSAGE=$(printf '%-30s' "$PRETTYNAME $USAGE")   
-      TUSAGE="$TUSAGE $BUSAGE $DESC\n"
-      USAGE=""
-      if [ "$_SUBCOMMAND" = "$FNAME" ]; then
-        FOUND=true
-      fi
-    fi
-  done
+  __FILENAME="$__DIRNAME/$(basename "$1")"
+  # echo $__FILENAME/
+  __CMDNAME=$(basename "${__FILENAME%.*}")
+  __FILES=$(find "$__FILENAME" -maxdepth 1 -type f -name '*.sh' -print | sort -t '\0' -n)
   
-  if [ "$FOUND" = true ]; then
-    shift
-    shift
-    "$_SUBCOMMAND" "$@"
-  else
-    printf "Usage: <...args>\n"
-    printf "$TUSAGE"
-    exit 1
+  __SCRIPTCMDNAME=$__CMDNAME
+  
+  if [ "$ALIAS" != "" ]; then
+    __SCRIPTCMDNAME="$ALIAS"
   fi
 
+  if [ "$__CMDDEEP" = "" ]; then
+    __CMDDEEP="$__SCRIPTCMDNAME"
+  else
+    __CMDDEEP="$__CMDDEEP $__SCRIPTCMDNAME"
+  fi
+  
+  __SUBCMD=$(echo "$2" | tr '_' '-')
+  __EXE=false
+  __EXEFILENAME=""
+  __EXEDIRNAME=""
+  __HELPLINES=""
+  
+  USAGE=''
+  ALIAS=''
+  DESC=''
+
+  for __FILENAME in $__FILES; do
+    if [ -f "$__FILENAME" ]; then
+      __DIRNAME="$(cd "$(dirname "$__FILENAME")" || exit; pwd)"
+      __CMDNAME=$(basename "${__FILENAME%.*}") # ex. run, run_npm, ts_node
+      __HUMANCMDNAME=$(echo "$__CMDNAME" | tr '_' '-')
+      
+      # shellcheck disable=SC1090
+      . "$__FILENAME"
+
+      if [ "$ALIAS" != "" ]; then
+        __HUMANCMDNAME="$ALIAS"
+      fi
+
+      __HELPLINES="$__HELPLINES$(printf '%-30s' "$__HUMANCMDNAME $USAGE") $DESC\n"
+
+      if [ "$__SUBCMD" = "$__HUMANCMDNAME" ]; then
+        __EXEFILENAME=$__FILENAME
+        __EXEDIRNAME=$__DIRNAME
+        __EXE="$__CMDNAME"
+      fi
+
+      USAGE=''
+      ALIAS=''
+      DESC=''
+    fi
+  done
+
+  if [ "$__EXE" != false ]; then
+    __FILENAME="$__EXEFILENAME"
+    __DIRNAME="$__EXEDIRNAME"
+
+    shift;
+    shift
+    "$__EXE" "$@"
+  else
+    printf '%b' "Usage: $__CMDDEEP <...args>\n\n"
+    printf '%b' "$__HELPLINES"
+    exit 1
+  fi
 }
 
-__FILENAME=$0
-__DIRNAME=$TOPBASE
-command ./scripts $@
+ALIAS='run'
+command ./scripts "$@"

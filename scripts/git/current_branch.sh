@@ -1,8 +1,6 @@
-#!/bin/bash
-# shellcheck disable=SC2034
-USAGE=""
-# shellcheck disable=SC2034
-DESC="say waht the current branch is"#!/bin/bash
+#!/bin/sh
+export USAGE=""
+export DESC="say waht the current branch is"
 
 current_branch () {
   echo "master"

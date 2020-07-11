@@ -24,5 +24,4 @@ jobs:
       uses: actions/setup-node@v1
       with:
         node-version: ${{ matrix.node-version }}
-    - run: ./run || exit 0
-    - run: ./run git current-branch
+    - run: sh ./test.sh
